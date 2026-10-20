@@ -1,0 +1,19 @@
+{% macro kpi(v) -%}
+<span class="kpi"><b>{{ '%.0f'|format(v) }}</b><span class="meter"><i class="{{ 'lo' if v < 50 else 'mid' if v < 65 else 'hi' if v >= 80 else '' }}" style="width:{{ '%.0f'|format(v) }}%"></i></span></span>
+{%- endmacro %}
+
+{% macro grade(v) -%}
+{% if v is none %}<span class="note">–</span>{% else %}<span class="g{{ v }}">{{ v }}</span>{% endif %}
+{%- endmacro %}
+
+{% macro pctc(v, good=90, bad=80) -%}
+<span class="{{ 'g2' if v < bad else 'g3' if v < good else '' }}">{{ '%.0f'|format(v) }}%</span>
+{%- endmacro %}
+
+{% macro growth(v) -%}
+{% if v is none %}–{% else %}<span class="{{ 'delta-up' if v >= 8 else 'delta-down' if v < 3 else '' }}">{{ '%+.1f'|format(v) }}</span>{% endif %}
+{%- endmacro %}
+
+{% macro bar(label, value, maxv, fmt='{:.0f}', cls='') -%}
+<div class="brow"><span>{{ label }}</span><span class="track"><i class="{{ cls }}" style="width:{{ '%.1f'|format(100 * value / maxv if maxv else 0) }}%"></i></span><span class="num">{{ fmt.format(value) }}</span></div>
+{%- endmacro %}

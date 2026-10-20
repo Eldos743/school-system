@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% import "_m.html" as m %}
+{% block title %}{{ t('students_title') }}{% if cur %} · {{ cur.name }}{% endif %}{% endblock %}
+{% block head %}
+<h1>{{ t('students_title') }}{% if cur %} · {{ cur.name }}{% endif %}</h1>
+<p class="lead">{{ t('students_lead') }}</p>
+{% endblock %}
+{% block body %}
+<nav class="chips" aria-label="{{ t('filter_class') }}">
+  <a href="{{ url_for('students', lang=lang) }}" class="{{ 'on' if not cur }}">{{ t('all') }}</a>
+  {% for c in classes %}<a href="{{ url_for('students', lang=lang, class_id=c.id) }}" class="{{ 'on' if cur and cur.id == c.id }}">{{ c.name }}</a>{% endfor %}
+</nav>
+
+{% set risk = rows|selectattr('flag', 'equalto', 'risk')|list %}
+{% set watch = rows|selectattr('flag', 'equalto', 'watch')|list %}
+{% set strong = rows|selectattr('flag', 'equalto', 'strong')|list %}
+<div class="stats">
+  <div class="stat"><span class="k">{{ t('students_n')|capitalize }}</span><span class="v">{{ rows|length }}</span></div>
+  <div class="stat"><span class="k">{{ t('flag_risk') }}</span><span class="v" style="color:var(--bad)">{{ risk|length }}</span><span class="d">«2» / {{ t('attendance')|lower }} &lt; 85%</span></div>
+  <div class="stat"><span class="k">{{ t('extra') }}</span><span class="v" style="color:var(--warn)">{{ (risk + watch)|selectattr('need')|list|length }}</span></div>
+  <div class="stat"><span class="k">{{ t('flag_strong') }}</span><span class="v" style="color:var(--good)">{{ strong|length }}</span><span class="d">{{ t('avg_grade')|lower }} ≥ 4.6</span></div>
+</div>
+
+<section class="sec">
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>{{ t('student') }}</th>{% if not cur %}<th>{{ t('class') }}</th>{% endif %}
+      <th class="n">{{ t('attendance') }}</th><th class="n">{{ t('avg_q', lq) }}</th><th class="n">{{ t('growth') }}, {{ t('pp') }}</th>
+      <th>{{ t('extra') }}</th><th class="n hide-sm">ҰБТ</th><th class="c hide-sm">{{ t("olymp_short") }}</th><th>{{ t('status') }}</th></tr></thead>
+    <tbody>
+    {% for x in rows %}{% set r = x.r %}
+      <tr>
+        <td><a class="who" href="{{ url_for('student', lang=lang, sid=r.id) }}">{{ r.full_name }}</a></td>
+        {% if not cur %}<td>{{ r.cname }}</td>{% endif %}
+        <td class="n">{{ m.pctc(r.att, 92, 85) }}</td>
+        <td class="n">{{ '%.2f'|format(r.avg) if r.avg else '–' }}</td>
+        <td class="n">{{ m.growth(r.growth) }}</td>
+        <td class="note">{% for n in x.need[:3] %}{{ name(n.subject) }}{{ ', ' if not loop.last }}{% endfor %}{% if x.need|length > 3 %} +{{ x.need|length - 3 }}{% endif %}</td>
+        <td class="n hide-sm">{{ r.ent or '' }}</td>
+        <td class="c hide-sm">{{ r.olymp or '' }}</td>
+        <td><span class="pill {{ {'risk': 'p-bad', 'watch': 'p-warn', 'strong': 'p-good', 'ok': 'p-mute'}[x.flag] }}">{{ t('flag_' ~ x.flag) }}</span></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</section>
+{% endblock %}

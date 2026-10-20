@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% import "_m.html" as m %}
+{% block title %}{{ t('founder_title') }}{% endblock %}
+{% block head %}
+<h1>{{ t('founder_title') }}</h1>
+<p class="lead">{{ t('founder_lead') }}</p>
+{% endblock %}
+{% block body %}
+{% set qcur = d.quality[-1] %}{% set qfirst = d.quality[0] %}
+
+<section class="sec">
+  <div class="sec-h"><h2>{{ t('quality_title') }}</h2><span class="note">{{ d.lq }} {{ t('q') }}</span></div>
+  <div class="stats">
+    <div class="stat"><span class="k">{{ t('kz_quality') }}</span>
+      <span class="v">{{ '%.0f'|format(qcur.quality) }}%</span>
+      <span class="d"><span class="{{ 'delta-up' if qcur.quality >= qfirst.quality else 'delta-down' }}">{{ '%+.0f'|format(qcur.quality - qfirst.quality) }} {{ t('pp') }}</span> · {{ t('kz_quality_def') }}</span></div>
+    <div class="stat"><span class="k">{{ t('kz_success') }}</span>
+      <span class="v">{{ '%.0f'|format(qcur.success) }}%</span>
+      <span class="d"><span class="{{ 'delta-up' if qcur.success >= qfirst.success else 'delta-down' }}">{{ '%+.0f'|format(qcur.success - qfirst.success) }} {{ t('pp') }}</span> · {{ t('kz_success_def') }}</span></div>
+    <div class="stat"><span class="k">{{ t('kz_growth') }}</span>
+      <span class="v">{{ '%+.1f'|format(d.growth.g) }}<small>{{ t('pp') }}</small></span>
+      <span class="d">{{ t('kz_growth_def', s=d.growth.s, e=d.growth.e) }}</span></div>
+    <div class="stat"><span class="k">{{ t('kz_att') }}</span>
+      <span class="v">{{ '%.1f'|format(d.att) }}%</span>
+      <span class="d">{{ t('kz_att_def') }}</span></div>
+  </div>
+  <div class="grid2">
+    <div>
+      <div class="legend"><span>{{ t('kz_quality') }}, %</span><span class="l2">{{ t('kz_success') }}, %</span></div>
+      {{ charts.line_chart(ql(d.quality|map(attribute='q')),
+         [dict(name=t('kz_quality'), values=d.quality|map(attribute='quality')|list, cls='s1', area=True),
+          dict(name=t('kz_success'), values=d.quality|map(attribute='success')|list, cls='s2')],
+         0, 100, [0, 25, 50, 75, 100]) }}
+    </div>
+    <div class="bars" style="align-content:center">
+      <h3>{{ t('students_now') }}: {{ d.students_now }}</h3>
+      <p class="note">{{ t('joined_mid', d.joined_midyear) }} · {{ t('left_n', d.left_students|sum(attribute='n')) }}</p>
+      <h3 style="margin-top:8px">{{ t('need_support_n') }}</h3>
+      {% set ns = d.kpis|selectattr('needs_support')|list %}
+      <p class="note">{{ ns|length }} / {{ d.kpis|length }}:
+        {% for r in ns %}<a href="{{ url_for('teacher', lang=lang, tid=r.t.id) }}">{{ r.t.full_name.split(' ')[0] }} {{ r.t.full_name.split(' ')[1][0] }}.</a>{{ ', ' if not loop.last }}{% endfor %}</p>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="sec-h"><h2>{{ t('class_dyn') }}</h2><span class="note">{{ t('class_dyn_note') }}</span></div>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>{{ t('class') }}</th><th class="n hide-sm">{{ t('students_n') }}</th>
+      {% for qq in QUARTERS %}<th class="n">{{ t('q_short', qq) }}</th>{% endfor %}
+      <th></th><th class="n">{{ t('kz_growth') }}</th><th class="n hide-sm">{{ t('avg_grade') }}</th></tr></thead>
+    <tbody>
+    {% for r in d.class_rows %}
+      <tr>
+        <td><a class="who" href="{{ url_for('students', lang=lang, class_id=r.c.id) }}">{{ r.c.name }}</a></td>
+        <td class="n hide-sm">{{ r.n }}</td>
+        {% for v in r.qual %}<td class="n">{{ '%.0f'|format(v) }}%</td>{% endfor %}
+        <td>{{ charts.spark(r.qual, 0, 100, cls='s1' if r.qual[-1] >= r.qual[0] else 's2') }}</td>
+        <td class="n">{{ m.growth(r.growth) }}</td>
+        <td class="n hide-sm">{{ '%.2f'|format(r.avg[-1]) }}</td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</section>
+
+<div class="grid2">
+<section class="sec">
+  <div class="sec-h"><h2>{{ t('kpi_rating') }}</h2><a href="{{ url_for('teachers', lang=lang) }}">{{ t('show_all') }} →</a></div>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th class="n">#</th><th>{{ t('teacher') }}</th><th>KPI</th></tr></thead>
+    <tbody>
+    {% for r in d.kpis %}
+      {% if loop.index <= 5 or loop.revindex <= 4 %}
+      <tr><td class="n note">{{ r.rank }}</td>
+        <td><a class="who" href="{{ url_for('teacher', lang=lang, tid=r.t.id) }}">{{ r.t.full_name.split(' ')[:2]|join(' ') }}</a><span class="sub">{{ name(r.t, 'subj') }}</span></td>
+        <td>{{ m.kpi(r.kpi) }}</td></tr>
+      {% elif loop.index == 6 %}<tr><td></td><td colspan="2" class="note">⋯</td></tr>{% endif %}
+    {% endfor %}
+    </tbody>
+  </table></div>
+</section>
+
+<section class="sec">
+  <div class="sec-h"><h2>{{ t('parents_title') }}</h2></div>
+  <div class="stats">
+    {% for s in d.surveys %}
+    <div class="stat"><span class="k">{{ t('satisfaction') }} · {{ t('survey_dec') if s.date[5:7] == '12' else t('survey_may') }}</span>
+      <span class="v">{{ '%.0f'|format(s.sat) }}%</span>
+      <span class="d">{{ t('avg_rating', s.avg, s.n) }}</span></div>
+    {% endfor %}
+  </div>
+  <div class="sec-h"><h3>{{ t('complaints') }}</h3><span class="note">{{ t('complaints_sum', n=d.complaints_total, o=d.complaints_open) }}</span></div>
+  <div class="bars">
+    {% set mx = d.complaints|map(attribute='n')|max %}
+    {% for c in d.complaints %}
+      {{ m.bar(t('cc_' ~ c.category) ~ (' · ' ~ c.open ~ ' ' ~ t('open') if c.open else ''), c.n, mx, cls='s2') }}
+    {% endfor %}
+  </div>
+</section>
+</div>
+
+<section class="sec">
+  <div class="sec-h"><h2>{{ t('staff_title') }}</h2></div>
+  <div class="stats">
+    <div class="stat"><span class="k">{{ t('staff_now') }}</span><span class="v">{{ d.staff_now }}</span><span class="d">{{ t('new_hires') }}: {{ d.new_hires }}</span></div>
+    <div class="stat"><span class="k">{{ t('turnover') }}</span><span class="v">{{ '%.1f'|format(d.turnover) }}%</span><span class="d">{{ t('turnover_def') }}</span></div>
+  </div>
+  <div class="grid2">
+    <div class="bars">
+      <h3>{{ t('tenure') }}</h3>
+      {% set mx = d.tenure_buckets|max %}
+      {% for lab in t('tenure_b') %}{{ m.bar(lab, d.tenure_buckets[loop.index0], mx) }}{% endfor %}
+    </div>
+    <div>
+      <h3>{{ t('leavers') }}</h3>
+      <ul class="list">
+        {% for l in d.leavers %}
+        <li><span><span class="who">{{ l.full_name.split(' ')[:2]|join(' ') }}</span><span class="sub">{{ name(l) }} · {{ l.left_date|dt }}</span></span>
+          <span class="pill p-warn">{{ t('tr_' ~ l.left_reason) }}</span></li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="sec-h"><h2>{{ t('students_flow') }}</h2></div>
+  <div class="grid3">
+    <div class="bars">
+      <h3>{{ t('funnel') }}</h3>
+      {% set mx = d.funnel[0][1] %}
+      {% for k, v in d.funnel %}{{ m.bar(t('fn_' ~ k), v, mx) }}{% endfor %}
+      <p class="note">{{ '%.0f'|format(100 * d.funnel[2][1] / d.funnel[0][1]) }}% {{ t('fn_enrolled')|lower }}</p>
+    </div>
+    <div class="bars">
+      <h3>{{ t('sources') }}</h3>
+      {% set mx = d.adm_sources|map(attribute='n')|max %}
+      {% for s in d.adm_sources %}{{ m.bar(t('src_' ~ s.source), s.n, mx, cls='s2') }}{% endfor %}
+      <p class="note">{% for s in d.adm_sources %}{{ t('src_' ~ s.source) }}: {{ '%.0f'|format(100 * s.e / s.n) }}%{{ ' · ' if not loop.last }}{% endfor %}</p>
+    </div>
+    <div class="bars">
+      <h3>{{ t('leave_reasons') }}</h3>
+      {% set mx = d.left_students|map(attribute='n')|max %}
+      {% for s in d.left_students %}{{ m.bar(t('lr_' ~ s.left_reason), s.n, mx, cls='bad') }}{% endfor %}
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="sec-h"><h2>{{ t('punct_title') }}</h2><span class="note">{{ t('punct_note') }}</span></div>
+  <div class="grid2">
+    <div>
+      {{ charts.line_chart(ml(d.punct_monthly|map(attribute='m')),
+          [dict(name='%', values=d.punct_monthly|map(attribute='ontime')|list, cls='s1', area=True)],
+          80, 100, [80, 85, 90, 95, 100]) }}
+    </div>
+    <div>
+      <h3>{{ t('punct_worst') }}</h3>
+      <ul class="list">
+        {% for r in d.punct_teachers %}
+        <li><a class="who" href="{{ url_for('teacher', lang=lang, tid=r.t.id) }}">{{ r.t.full_name.split(' ')[:2]|join(' ') }}</a>
+          <span class="note">{{ r.arrivals.late }} {{ t('late_days') }} · {{ t('ontime_rate', r.raw.punctuality) }}</span></li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</section>
+{% endblock %}

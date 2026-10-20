@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% import "_m.html" as m %}
+{% set s = d.s %}
+{% block title %}{{ s.full_name }}{% endblock %}
+{% block head %}
+<a class="crumb" href="{{ url_for('students', lang=lang, class_id=s.class_id) }}">← {{ t('students_title') }} · {{ s.cname }}</a>
+<h1>{{ s.full_name }}</h1>
+<p class="lead">{{ s.cname }} · {{ t('homeroom') }}: {{ s.homeroom }} · {{ t('parent') }}: {{ s.parent_name }}, {{ s.parent_phone }}</p>
+{% endblock %}
+{% block body %}
+{% set a = d.att %}
+{% set rate = 100 * (a.present + a.late) / a.n if a.n else 0 %}
+<div class="stats">
+  <div class="stat"><span class="k">{{ t('attendance') }}</span><span class="v">{{ '%.1f'|format(rate) }}%</span><span class="d">{{ a.absent }} / {{ a.excused }} / {{ a.late }}</span></div>
+  <div class="stat"><span class="k">{{ t('avg_grade') }}</span><span class="v">{{ '%.2f'|format(d.quarter_avg[-1].avg) if d.quarter_avg else '–' }}</span>
+    {% if d.quarter_avg|length > 1 %}{% set dv = d.quarter_avg[-1].avg - d.quarter_avg[0].avg %}<span class="d"><span class="{{ 'delta-up' if dv >= 0 else 'delta-down' }}">{{ '%+.2f'|format(dv) }}</span> · {{ t('q_short', 1) }} → {{ t('q_short', d.quarter_avg[-1].quarter) }}</span>{% endif %}</div>
+  <div class="stat"><span class="k">{{ t('extra') }}</span><span class="v" style="color:var({{ '--warn' if d.need else '--good' }})">{{ d.need|length }}</span><span class="d">{{ t('subject')|lower }}</span></div>
+  <div class="stat"><span class="k">ҰБТ</span><span class="v">{{ d.ent[-1].score if d.ent else '–' }}{% if d.ent %}<small>/ 140</small>{% endif %}</span><span class="d">{{ t('olymp_list') }}: {{ d.olymp|length }}</span></div>
+</div>
+
+<div class="grid2">
+<section class="sec">
+  <div class="sec-h"><h2>{{ t('attendance_detail') }}</h2></div>
+  <p class="note">{{ t('att_note', n=a.n, p=a.present, l=a.late, a=a.absent, e=a.excused) }}</p>
+  {{ charts.line_chart(ml(d.att_monthly|map(attribute='m')),
+     [dict(name='%', values=d.att_monthly|map(attribute='rate')|list, cls='s1', area=True)],
+     70, 100, [70, 80, 90, 100]) }}
+</section>
+
+<section class="sec">
+  <div class="sec-h"><h2>{{ t('performance') }}</h2></div>
+  <div class="legend"><span>{{ t('student_avg') }}</span><span class="l3">{{ t('class_avg') }}</span></div>
+  {{ charts.line_chart(ql(d.class_avg|map(attribute='quarter')),
+     [dict(name=t('class_avg'), values=d.class_avg|map(attribute='avg')|list, cls='s3', label_end=False),
+      dict(name=t('student_avg'), values=d.quarter_avg|map(attribute='avg')|list, cls='s1')],
+     2, 5, [2, 3, 4, 5], fmt='{:.2f}') }}
+</section>
+</div>
+
+<section class="sec">
+  <div class="sec-h"><h2>{{ t('grades_table') }}</h2><span class="note">{{ t('diagnostics') }}, %</span></div>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>{{ t('subject') }}</th>{% for qq in QUARTERS %}<th class="c">{{ t('q_short', qq) }}</th>{% endfor %}
+      <th class="n">{{ t('diag_start') }}</th><th class="n">{{ t('diag_mid') }}</th><th class="n">{{ t('diag_end') }}</th><th class="n">{{ t('growth') }}</th><th></th></tr></thead>
+    <tbody>
+    {% set diag = {} %}{% for x in d.diags %}{% set _ = diag.update({x.sid: x}) %}{% endfor %}
+    {% for sid, row in d.table.items() %}{% set x = diag.get(sid) %}
+      <tr><td>{{ d.names[sid][0 if lang == 'kz' else 1] }}</td>
+        {% for qq in QUARTERS %}<td class="c">{{ m.grade(row.get(qq)) }}</td>{% endfor %}
+        {% if x %}
+          <td class="n">{{ x.start or '–' }}</td><td class="n">{{ x.mid or '–' }}</td>
+          <td class="n"><span class="{{ 'g2' if x.end_ and x.end_ < 50 else '' }}">{{ x.end_ or '–' }}</span></td>
+          <td class="n">{{ m.growth(x.end_ - x.start if x.end_ and x.start else none) }}</td>
+          <td>{{ charts.spark([x.start, x.mid, x.end_], 0, 100) }}</td>
+        {% else %}<td colspan="5"></td>{% endif %}
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</section>
+
+<div class="grid2">
+<section class="sec">
+  <div class="sec-h"><h2>{{ t('extra_title') }}</h2></div>
+  {% if d.need %}
+  <ul class="list">
+    {% for n in d.need %}
+    <li><span class="who">{{ name(n.subject) }}</span>
+      <span class="chips">{% for k, v in n.reasons %}<span class="pill {{ 'p-bad' if (k == 'grade' and v <= 2) or (k == 'diag' and v < 35) else 'p-warn' }}">{{ t('reason_' ~ k, v) }}</span>{% endfor %}</span></li>
+    {% endfor %}
+  </ul>
+  {% else %}<p class="note">{{ t('extra_none') }}</p>{% endif %}
+  <p class="note">{{ t('extra_rule') }}</p>
+</section>
+
+<section class="sec">
+  <div class="sec-h"><h2>{{ t('olymp_ent') }}</h2></div>
+  {% if d.ent %}
+    <h3>{{ t('ent_mocks') }}</h3>
+    {{ charts.line_chart(ml(d.ent|map(attribute='date')),
+       [dict(name='ҰБТ', values=d.ent|map(attribute='score')|list, cls='s2', area=True)],
+       0, 140, [0, 50, 100, 140], target=(ENT_GRANT, t('ent_grant', ENT_GRANT)), height=190) }}
+    <p class="note">{{ t('ent_threshold', ENT_THRESHOLD) }} · {{ t('ent_grant', ENT_GRANT) }}</p>
+  {% elif s.grade >= 9 %}<p class="note">{{ t('ent_none') }}</p>{% endif %}
+  <h3>{{ t('olymp_list') }}</h3>
+  {% if d.olymp %}
+  <ul class="list">{% for o in d.olymp %}<li><span>{{ name(o) }} · {{ t('level_' ~ o.level) }}</span><span class="pill {{ 'p-good' if o.result.startswith('prize') else 'p-mute' }}">{{ t('res_' ~ o.result) }}</span></li>{% endfor %}</ul>
+  {% else %}<p class="note">{{ t('olymp_none') }}</p>{% endif %}
+  {% if d.olymp_ready %}
+  <h3>{{ t('olymp_ready') }}</h3>
+  <p class="chips">{% for x in d.olymp_ready %}<span class="pill p-acc">{{ name(x) }} · {{ x.end_ or x.mid }}%</span>{% endfor %}</p>
+  {% endif %}
+</section>
+</div>
+
+<section class="sec">
+  <div class="sec-h"><h2>{{ t('parent_history') }}</h2><span class="note">{{ s.parent_name }} · {{ s.parent_phone }}</span></div>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>{{ t('date') }}</th><th>{{ t('channel') }}</th><th>{{ t('topic') }}</th><th class="hide-sm">{{ t('by') }}</th></tr></thead>
+    <tbody>
+    {% for c in d.contacts %}
+      <tr><td style="white-space:nowrap">{{ c.date|dt }}</td><td>{{ t('ch_' ~ c.channel) }}</td><td>{{ t('tp_' ~ c.topic) }}</td><td class="note hide-sm">{{ c.teacher }}</td></tr>
+    {% endfor %}
+    {% for f in d.feedback %}
+      <tr><td style="white-space:nowrap">{{ f.date|dt }}</td>
+        <td>{{ t('survey') if f.kind == 'survey' else t('complaints') }}</td>
+        <td>{% if f.kind == 'survey' %}{{ '★' * f.rating }}<span class="note">{{ '★' * (5 - f.rating) }}</span>{% else %}{{ t('cc_' ~ f.category) }} <span class="pill {{ 'p-warn' if f.status == 'open' else 'p-mute' }}">{{ t(f.status) }}</span>{% endif %}</td>
+        <td class="hide-sm"></td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</section>
+{% endblock %}

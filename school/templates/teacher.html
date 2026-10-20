@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% import "_m.html" as m %}
+{% set c = d.c %}
+{% block title %}{{ c.t.full_name.split(' ')[:2]|join(' ') }}{% endblock %}
+{% block head %}
+<a class="crumb" href="{{ url_for('teachers', lang=lang) }}">← {{ t('teachers_title') }}</a>
+<h1>{{ c.t.full_name }}</h1>
+<p class="lead">{{ name(c.t, 'subj') }} · {{ t('category') }}: {{ c.t.category }} · {{ t('experience') }}: {{ c.years }} {{ t('years_short') }}
+  {% if c.needs_support %} · <span class="pill p-bad">{{ t('need_support') }}</span>{% endif %}</p>
+{% endblock %}
+{% block body %}
+<div class="grid2">
+<section class="sec">
+  <div class="sec-h"><h2>{{ t('kpi_breakdown') }}</h2><span class="note">{{ t('rank') }}: {{ c.rank }}</span></div>
+  <div style="display:flex;align-items:baseline;gap:10px"><span class="stat"><span class="v" style="font-size:40px">{{ '%.0f'|format(c.kpi) }}</span></span><span class="note">/ 100</span></div>
+  <div class="bars">
+    {% for k, w in weights.items() %}
+      <div class="brow"><span>{{ t('kpi_' ~ k) }} <span class="note">· {{ w }}%</span></span>
+        <span class="track"><i class="{{ 'bad' if c.score[k] < 50 else '' }}" style="width:{{ '%.0f'|format(c.score[k]) }}%"></i></span>
+        <span class="num">{{ '%.0f'|format(c.score[k]) }}</span></div>
+    {% endfor %}
+  </div>
+</section>
+
+{% if recs %}
+<section class="alert">
+  <h2>{{ t('support_plan') }}</h2>
+  <ul class="list">
+  {% for k in c.weak %}<li><span><span class="pill p-bad">{{ t('kpi_' ~ k) }}</span> {{ t(recs[loop.index0]) }}</span></li>{% endfor %}
+  </ul>
+</section>
+{% else %}
+<section class="sec">
+  <h2>{{ t('grades_dyn') }}</h2>
+  <div class="legend"><span>{{ t('avg_grade') }}</span></div>
+  {{ charts.line_chart(ql(d.quarters|map(attribute='quarter')),
+     [dict(name=t('avg_grade'), values=d.quarters|map(attribute='avg')|list, cls='s1', area=True)],
+     3, 5, [3, 3.5, 4, 4.5, 5], fmt='{:.2f}') }}
+</section>
+{% endif %}
+</div>
+
+<section class="sec">
+  <div class="sec-h"><h2>{{ t('arrival') }}</h2></div>
+  {% set a = c.arrivals %}
+  <p class="note">{{ t('arrival_note', n=a.n, on=a.ontime, late=a.late, mins=a.late_min, absent=a.absent) }}</p>
+  <div class="grid2">
+    <div>
+      <h3>{{ t('late_by_month') }}</h3>
+      {% set mx = [d.monthly|map(attribute='late')|max, 4]|max %}
+      {{ charts.column_chart(ml(d.monthly|map(attribute='m')), d.monthly|map(attribute='late')|list, mx,
+          range(0, mx + 1, 1 if mx <= 5 else 2)|list, highlight=None) }}
+    </div>
+    <div>
+      <h3>{{ t('recent_late') }}</h3>
+      {% if d.late_days %}
+      <ul class="list">{% for r in d.late_days %}<li><span>{{ r.date|dt }}</span><span class="note">{{ t('arrived') }} {{ r.arrival_time }} · +{{ r.late_minutes }} {{ t('minutes') }}</span></li>{% endfor %}</ul>
+      {% else %}<p class="note">{{ t('none') }}</p>{% endif %}
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <div class="sec-h"><h2>{{ t('observations') }}</h2><span class="note">0–25 × 4</span></div>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>{{ t('date') }}</th><th>{{ t('class') }}</th><th class="hide-sm">{{ t('observer') }}</th>
+      <th class="n">{{ t('obs_planning') }}</th><th class="n">{{ t('obs_methods') }}</th><th class="n">{{ t('obs_engagement') }}</th><th class="n">{{ t('obs_assessment') }}</th>
+      <th class="n">{{ t('total') }}</th><th>{{ t('comment') }}</th></tr></thead>
+    <tbody>
+    {% for o in d.observations %}{% set tot = o.planning + o.methods + o.engagement + o.assessment %}
+      <tr><td>{{ o.date|dt }}</td><td>{{ o.cname }}</td><td class="hide-sm note">{{ o.observer }}</td>
+        <td class="n">{{ o.planning }}</td><td class="n">{{ o.methods }}</td><td class="n">{{ o.engagement }}</td><td class="n">{{ o.assessment }}</td>
+        <td class="n"><b class="{{ 'g2' if tot < 60 else 'g3' if tot < 75 else 'g5' if tot >= 90 else '' }}">{{ tot }}</b></td>
+        <td class="note">{{ o.comment }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</section>
+
+<div class="grid2">
+<section class="sec">
+  <div class="sec-h"><h2>{{ t('tasks') }}</h2><span class="note">{{ c.tasks.ontime }} / {{ c.tasks.n }} {{ t('task_ontime')|lower }}</span></div>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>{{ t('task') }}</th><th>{{ t('due') }}</th><th>{{ t('status') }}</th></tr></thead>
+    <tbody>
+    {% for k in d.tasks %}
+      <tr><td>{{ k['title_' ~ lang] }}</td><td class="note" style="white-space:nowrap">{{ k.due_date|dt }}</td>
+        <td>{% if k.done_date is none %}<span class="pill p-bad">{{ t('task_missed') }}</span>
+          {% elif k.done_date > k.due_date %}<span class="pill p-warn">{{ t('task_late') }}</span>
+          {% else %}<span class="pill p-good">{{ t('task_ontime') }}</span>{% endif %}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</section>
+
+<section class="sec">
+  <div class="sec-h"><h2>{{ t('growth_title') }}</h2></div>
+  <p class="note">{{ t('growth_note') }}</p>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th>{{ t('class') }}</th><th class="n">{{ t('diag_start') }}</th><th class="n">{{ t('diag_mid') }}</th><th class="n">{{ t('diag_end') }}</th><th class="n">{{ t('growth') }}</th></tr></thead>
+    <tbody>
+    {% for r in d.by_class %}
+      <tr><td><a href="{{ url_for('students', lang=lang, class_id=r.id) }}">{{ r.name }}</a></td>
+        <td class="n">{{ '%.0f'|format(r.start) }}</td><td class="n">{{ '%.0f'|format(r.mid) }}</td><td class="n">{{ '%.0f'|format(r.end_) }}</td>
+        <td class="n">{{ m.growth(r.end_ - r.start) }}</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% if d.complaints %}
+  <h3>{{ t('complaints_title') }}</h3>
+  <ul class="list">{% for k in d.complaints %}<li><span>{{ k.date|dt }} · {{ k.cname }}</span><span><span class="note">{{ t('cc_' ~ k.category) }}</span> <span class="pill {{ 'p-warn' if k.status == 'open' else 'p-mute' }}">{{ t(k.status) }}</span></span></li>{% endfor %}</ul>
+  {% endif %}
+</section>
+</div>
+{% endblock %}

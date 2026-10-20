@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% import "_m.html" as m %}
+{% block title %}{{ t('teachers_title') }}{% endblock %}
+{% block head %}
+<h1>{{ t('teachers_title') }}</h1>
+<p class="lead">{{ t('teachers_lead') }}</p>
+{% endblock %}
+{% block body %}
+{% set ns = rows|selectattr('needs_support')|list %}
+<div class="stats">
+  <div class="stat"><span class="k">{{ t('avg_kpi') }}</span><span class="v">{{ '%.0f'|format(rows|sum(attribute='kpi') / rows|length) }}</span><span class="d">{{ rows|length }} {{ t('nav_teachers')|lower }}</span></div>
+  <div class="stat"><span class="k">{{ t('need_support') }}</span><span class="v">{{ ns|length }}</span><span class="d">KPI &lt; 65 / &lt; 50</span></div>
+  <div class="stat"><span class="k">{{ t('kpi_observation') }}</span><span class="v">{{ '%.0f'|format(rows|sum(attribute='raw.observation') / rows|length) }}<small>/100</small></span><span class="d">{{ t('obs_count', rows|sum(attribute='obs_n')) }}</span></div>
+  <div class="stat"><span class="k">{{ t('kpi_punctuality') }}</span><span class="v">{{ '%.1f'|format(rows|sum(attribute='raw.punctuality') / rows|length) }}%</span><span class="d">{{ rows|sum(attribute='arrivals.late') }} {{ t('late_days') }}</span></div>
+</div>
+
+{% if ns %}
+<section class="alert">
+  <h2>{{ t('need_support_n') }}</h2>
+  <ul class="list">
+  {% for r in ns %}
+    <li><span><a class="who" href="{{ url_for('teacher', lang=lang, tid=r.t.id) }}">{{ r.t.full_name }}</a><span class="sub">{{ name(r.t, 'subj') }} · KPI {{ '%.0f'|format(r.kpi) }}</span></span>
+      <span class="chips">{% for w in r.weak %}<span class="pill p-bad">{{ t('kpi_' ~ w) }}</span>{% endfor %}{% if not r.weak %}<span class="pill p-warn">KPI &lt; 65</span>{% endif %}</span></li>
+  {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+<section class="sec">
+  <div class="sec-h"><h2>{{ t('kpi_rating') }}</h2></div>
+  <div class="tbl-wrap"><table>
+    <thead><tr><th class="n">#</th><th>{{ t('teacher') }}</th><th>KPI</th>
+      <th class="n">{{ t('obs_score') }}</th><th class="n">{{ t('growth') }}, {{ t('pp') }}</th>
+      <th class="n">{{ t('tasks_done') }}</th><th class="n">{{ t('lateness') }}</th>
+      <th class="n">{{ t('kpi_quality') }}</th><th class="n">{{ t('complaints') }}</th><th></th></tr></thead>
+    <tbody>
+    {% for r in rows %}
+    <tr>
+      <td class="n note">{{ r.rank }}</td>
+      <td><a class="who" href="{{ url_for('teacher', lang=lang, tid=r.t.id) }}">{{ r.t.full_name.split(' ')[:2]|join(' ') }}</a><span class="sub">{{ name(r.t, 'subj') }} · {{ r.t.category }}</span></td>
+      <td>{{ m.kpi(r.kpi) }}</td>
+      <td class="n"><span class="{{ 'g2' if r.score.observation < 50 else '' }}">{{ '%.0f'|format(r.raw.observation) }}</span></td>
+      <td class="n">{{ m.growth(r.raw.growth) }}</td>
+      <td class="n">{{ r.tasks.ontime }}/{{ r.tasks.n }}</td>
+      <td class="n"><span class="{{ 'g2' if r.score.punctuality < 50 else '' }}">{{ r.arrivals.late }}</span></td>
+      <td class="n">{{ '%.0f'|format(r.raw.quality) }}%</td>
+      <td class="n">{{ r.raw.complaints or '–' }}</td>
+      <td>{% if r.needs_support %}<span class="pill p-bad">{{ t('need_support') }}</span>{% endif %}</td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</section>
+
+<section class="sec">
+  <div class="sec-h"><h2>{{ t('kpi_formula') }}</h2></div>
+  <div class="formula">
+    {% for k, w in weights.items() %}
+    <div><b>{{ w }}%</b>{{ t('kpi_' ~ k) }}<span>{{ t('kpi_src_' ~ k) }}</span></div>
+    {% endfor %}
+  </div>
+  <p class="note">{{ t('kpi_formula_note') }}</p>
+</section>
+{% endblock %}
