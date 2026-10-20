@@ -64,6 +64,7 @@ def export(out=BASE / "demo"):
         dest = out / path.lstrip("/")
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(html, encoding="utf-8")
+    shutil.copy(BASE / "school" / "landing.html", out / "index.html")
     print(f"Сохранено страниц: {len(seen)} → {out}")
 
 
